@@ -1,4 +1,5 @@
 from clearwater_data.custom_types import ArrayLike
+from clearwater_data.variables import DataArrayVariable
 from pathlib import Path
 import pandas as pd
 
@@ -10,7 +11,7 @@ class CSVDataSource:
         # self.interpolation_method = kwargs.pop("interpolation_method", "linear")
         self.__data: ArrayLike | None = None
 
-    def read(self, parameter_name: str) -> ArrayLike:
+    def read(self, parameter_name: str) -> DataArrayVariable:
         # load data if we don't have it cached
         if self.__data is None:
             df = pd.read_csv(self.file_path)
@@ -21,4 +22,4 @@ class CSVDataSource:
 
             self.__data = df.to_xarray()
 
-        return self.__data[parameter_name]
+        return DataArrayVariable(self.__data[parameter_name], "time")
