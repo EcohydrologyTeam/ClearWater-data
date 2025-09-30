@@ -23,3 +23,29 @@ class DataArrayVariable(Variable):
             return self.data_array.sel({self.time_dimension: time})
         # otherwise return the value
         return self.data_array
+
+    def resample(
+        self,
+        new_time_frequency: datetime,
+        method: str = "linear",
+    ) -> None:
+        if self.time_dimension is None:
+            raise ValueError("Cannot resample a variable with no time dimension")
+
+        self.data_array = self.data_array.resample(
+            {self.time_dimension: new_time_frequency}
+        ).interpolate(method)
+
+    def subset_time(
+        self,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+    ) -> None:
+        if start_time is not None:
+            self.data_array = self.data_array.sel(
+                {self.time_dimension: slice(start_time, None)}
+            )
+        if end_time is not None:
+            self.data_array = self.data_array.sel(
+                {self.time_dimension: slice(None, end_time)}
+            )
