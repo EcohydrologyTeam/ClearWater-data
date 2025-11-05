@@ -8,6 +8,7 @@ class CSVDataSource:
     def __init__(self, **kwargs) -> None:
         self.file_path: Path = kwargs.pop("file_path")
         self.time_field: str = kwargs.pop("time_field", None)
+        self.spatial_field: str = kwargs.pop("spatial_field", None)
         # self.interpolation_method = kwargs.pop("interpolation_method", "linear")
         self.__data: ArrayLike | None = None
 
@@ -18,7 +19,12 @@ class CSVDataSource:
 
             df = df.rename(columns={self.time_field: "time"})
             df["time"] = pd.to_datetime(df["time"])
-            df = df.set_index("time")
+            
+            # If spatial field is defined, set a multi-index for [time, spatial]
+            if self.spatial_field is not None and self.spatial_field in df.columns:
+                df = df.set_index(["time", self.spatial_field])
+            else:
+                df = df.set_index("time")
 
             self.__data = df.to_xarray()
 
