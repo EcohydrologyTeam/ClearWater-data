@@ -24,8 +24,8 @@ class ZarrDataStore:
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
 
-        self.spatial_dimension_name: str | None = kwargs.pop("spatial_dimension_name", None)
-        self.spatial_dimension_length: str | None = kwargs.pop("spatial_dimension_length", None)
+        self.spatial_field: str | None = kwargs.pop("spatial_field", None)
+        self.spatial_field_values = kwargs.pop("spatial_field_values", None)
 
         self._init_zarr_store()
 
@@ -35,10 +35,10 @@ class ZarrDataStore:
         shape = (self.time.shape[0],)
         coords = {"time": self.time}
 
-        if self.spatial_dimension_name and self.spatial_dimension_length:
-            dims = ("time", self.spatial_dim_name)
-            shape = (self.time.shape[0], self.spatial_dim_length)
-            coords[self.spatial_dim_name] = range(self.spatial_dim_length)
+        if self.spatial_field and self.spatial_field_values:
+            dims = ("time", self.spatial_field)
+            shape = (self.time.shape[0], len(self.spatial_field_values))
+            coords[self.spatial_field] = self.spatial_field_values
         
         return dims, shape, coords
 
@@ -70,8 +70,8 @@ class ChunkedZarrDataStore(ZarrDataStore):
         dims, shape, coords = self.__parse_zarr_coordinates()
 
         # set chunks
-        if self.spatial_dimension_name and self.spatial_dimension_length:
-            chunks = (chunk_length, self.spatial_dimension_length)
+        if self.spatial_field_name and self.spatial_field_values:
+            chunks = (chunk_length, len(self.spatial_field_values))
         else:
             chunks = (chunk_length,)
 
