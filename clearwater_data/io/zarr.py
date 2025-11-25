@@ -24,16 +24,16 @@ class ZarrDataStore:
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
 
-        self.__init_zarr_store()
+        self._init_zarr_store()
 
-    def __init_zarr_store(self) -> None:
-        time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
+    def _init_zarr_store(self) -> None:
+        self.time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
         template_dataset = xr.Dataset(
             {
-                v: (("time"), da.empty((time.shape[0]), dtype="float"))
+                v: (("time"), da.empty((self.time.shape[0]), dtype="float"))
                 for v in self.variables
             },
-            coords={"time": time},
+            coords={"time": self.time},
         )
 
         # write the template out to generate zarr
@@ -43,9 +43,24 @@ class ZarrDataStore:
         data.to_zarr(self.store_path, mode="a")
 
 
-class ChunkedZarrDataStore:
+class ChunkedZarrDataStore(ZarrDataStore):
     def __init__(self, **kwargs) -> None:
-        self.store_path = kwargs.pop("store_path")
+        self.chunk_size: timedelta = kwargs.pop("chunk_size")
+        super().__init__(**kwargs)
+    
+    def _init_zarr_store(self) -> None:
+        time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
+        chunk_length = int(self.chunk_size / self.time_step)
+        template_dataset = xr.Dataset(
+            {
+                v: (("time"), da.empty((time.shape[0]), dtype="float", chunks=(chunk_length,)))
+                for v in self.variables
+            },
+            coords={"time": time},
+        )
+        
+        # write the template out to generate zarr
+        template_dataset.to_zarr(self.store_path, mode="w", compute=False)
 
     def write_chunk(
         self,
@@ -54,4 +69,10 @@ class ChunkedZarrDataStore:
         start_time: datetime,
         end_time: datetime,
     ) -> None:
-        data.to_zarr(self.store_path, mode="a")
+        start_index = self.time.get_loc(start_time)
+        end_index = self.time.get_loc(end_time)
+        data.to_zarr(
+            self.store_path,
+            group=parameter_name,
+            region={"time": slice(start_index, end_index)}
+        )
