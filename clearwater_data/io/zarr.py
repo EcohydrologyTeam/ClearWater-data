@@ -24,16 +24,34 @@ class ZarrDataStore:
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
 
+        self.spatial_dimension_name: str | None = kwargs.pop("spatial_dimension_name", None)
+        self.spatial_dimension_length: str | None = kwargs.pop("spatial_dimension_length", None)
+
         self._init_zarr_store()
 
-    def _init_zarr_store(self) -> None:
+    def __parse_zarr_coordinates(self):
         self.time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
+        dims = ("time",)
+        shape = (self.time.shape[0],)
+        coords = {"time": self.time}
+
+        if self.spatial_dimension_name and self.spatial_dimension_length:
+            dims = ("time", self.spatial_dim_name)
+            shape = (self.time.shape[0], self.spatial_dim_length)
+            coords[self.spatial_dim_name] = range(self.spatial_dim_length)
+        
+        return dims, shape, coords
+
+
+    def __init_zarr_store(self) -> None:
+        dims, shape, coords = self.__parse_zarr_coordinates()
+
         template_dataset = xr.Dataset(
             {
-                v: (("time"), da.empty((self.time.shape[0]), dtype="float"))
+                v: (dims, da.empty(shape, dtype="float"))
                 for v in self.variables
             },
-            coords={"time": self.time},
+            coords=coords,
         )
 
         # write the template out to generate zarr
@@ -49,16 +67,23 @@ class ChunkedZarrDataStore(ZarrDataStore):
         super().__init__(**kwargs)
     
     def _init_zarr_store(self) -> None:
-        time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
+        dims, shape, coords = self.__parse_zarr_coordinates()
+
+        # set chunks
+        if self.spatial_dimension_name and self.spatial_dimension_length:
+            chunks = (chunk_length, self.spatial_dimension_length)
+        else:
+            chunks = (chunk_length,)
+
         chunk_length = int(self.chunk_size / self.time_step)
         template_dataset = xr.Dataset(
             {
-                v: (("time"), da.empty((time.shape[0]), dtype="float", chunks=(chunk_length,)))
+                v: (dims, da.empty(shape, dtype="float", chunks=chunks))
                 for v in self.variables
             },
-            coords={"time": time},
+            coords=coords,
         )
-        
+
         # write the template out to generate zarr
         template_dataset.to_zarr(self.store_path, mode="w", compute=False)
 
