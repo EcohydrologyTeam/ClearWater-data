@@ -29,13 +29,14 @@ class ZarrDataStore:
 
         self._init_zarr_store()
 
-    def __parse_zarr_coordinates(self):
+    def _parse_zarr_coordinates(self):
         self.time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
         dims = ("time",)
         shape = (self.time.shape[0],)
         coords = {"time": self.time}
 
-        if self.spatial_field and self.spatial_field_values:
+        if self.spatial_field is not None and self.spatial_field_values is not None:
+
             dims = ("time", self.spatial_field)
             shape = (self.time.shape[0], len(self.spatial_field_values))
             coords[self.spatial_field] = self.spatial_field_values
@@ -43,8 +44,8 @@ class ZarrDataStore:
         return dims, shape, coords
 
 
-    def __init_zarr_store(self) -> None:
-        dims, shape, coords = self.__parse_zarr_coordinates()
+    def _init_zarr_store(self) -> None:
+        dims, shape, coords = self._parse_zarr_coordinates()
 
         template_dataset = xr.Dataset(
             {
@@ -67,15 +68,15 @@ class ChunkedZarrDataStore(ZarrDataStore):
         super().__init__(**kwargs)
     
     def _init_zarr_store(self) -> None:
-        dims, shape, coords = self.__parse_zarr_coordinates()
+        dims, shape, coords = self._parse_zarr_coordinates()
 
         # set chunks
-        if self.spatial_field_name and self.spatial_field_values:
+        chunk_length = int(self.chunk_size / self.time_step)
+        if self.spatial_field is not None and self.spatial_field_values is not None:
             chunks = (chunk_length, len(self.spatial_field_values))
         else:
             chunks = (chunk_length,)
 
-        chunk_length = int(self.chunk_size / self.time_step)
         template_dataset = xr.Dataset(
             {
                 v: (dims, da.empty(shape, dtype="float", chunks=chunks))
