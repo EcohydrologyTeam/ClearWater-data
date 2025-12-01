@@ -95,10 +95,18 @@ class ChunkedZarrDataStore(ZarrDataStore):
         start_time: datetime,
         end_time: datetime,
     ) -> None:
+        # parse time indices
         start_index = self.time.get_loc(start_time)
         end_index = self.time.get_loc(end_time)
-        data.to_zarr(
+
+        # prepare main variable slice; drop auxiliary coordinates
+        data_clean = data.drop_vars([
+            c for c in data.coords if c!= "time" and c != self.spatial_field
+        ])
+
+        data_clean.to_zarr(
             self.store_path,
-            group=parameter_name,
-            region={"time": slice(start_index, end_index)}
+            # group=parameter_name,
+            mode="a",
+            region={"time": slice(start_index, end_index + 1)}
         )
