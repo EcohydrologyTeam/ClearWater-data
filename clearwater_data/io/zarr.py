@@ -86,7 +86,7 @@ class ChunkedZarrDataStore(ZarrDataStore):
         )
 
         # write the template out to generate zarr
-        template_dataset.to_zarr(self.store_path, mode="w", compute=False)
+        template_dataset.to_zarr(self.store_path, mode="w", compute=False, consolidated=False)
 
     def write_chunk(
         self,
@@ -108,5 +108,6 @@ class ChunkedZarrDataStore(ZarrDataStore):
             self.store_path,
             # group=parameter_name,
             mode="a",
-            region={"time": slice(start_index, end_index + 1)}
+            region={"time": slice(start_index, end_index + 1)},
+            consolidated=False
         )
