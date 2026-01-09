@@ -1,6 +1,15 @@
 [project]
 name = "clearwater_data" 
 version = "0.1.0"
+dynamic = ["readme"]
+description = "Clearwater Python data manager."
+authors = [
+    {name = "Todd Steissberg", email = "Todd.E.Steissberg@erdc.dren.mil"},
+]
 
-[tool.setuptools]
-packages = ["clearwater_data"]
+[tool.setuptools.packages.find]
+where = ["clearwater_data"]
+include = ["clearwater_data*"]
+
+[tool.setuptools.dynamic]
+readme = {file = "README.md"}
