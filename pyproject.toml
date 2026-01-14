@@ -1,0 +1,32 @@
+[project]
+name = "clearwater_data" 
+version = "0.1.0"
+dynamic = ["readme"]
+description = "Clearwater Python data manager."
+authors = [
+    {name = "Todd Steissberg", email = "Todd.E.Steissberg@erdc.dren.mil"},
+]
+dependencies=[
+    "dask",
+    "pandas",
+    "xarray"
+]
+
+[build-system]
+build-backend = "hatchling.build"
+requires = ["hatchling"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.readme]
+path = "./README.md"
+
+[tool.pixi.workspace]
+channels = ["conda-forge"]
+platforms = ["win-64"]
+
+[tool.pixi.pypi-dependencies]
+clearwater_data = { path = ".", editable = true }
+
+[tool.pixi.tasks]
