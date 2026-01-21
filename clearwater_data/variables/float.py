@@ -1,5 +1,6 @@
 from clearwater_data.variables.base import Variable
 from datetime import datetime, timedelta
+import xarray as xr
 
 
 class FloatVariable(Variable):
@@ -10,15 +11,18 @@ class FloatVariable(Variable):
     time_dimension = None
 
     def __init__(self, value: float):
-        self.value = value
+        self.value = xr.DataArray(
+            float(value),
+            dims=(),
+        )
 
-    def get(self) -> float:
+    def get(self) -> xr.DataArray:
         """
         Get a reference to the variable's value
         """
         return self.value
 
-    def get_at_time(self, time: datetime) -> float:
+    def get_at_time(self, time: datetime) -> xr.DataArray:
         """
         Get a reference to the variable's value at a specific time
         """
