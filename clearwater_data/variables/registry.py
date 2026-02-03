@@ -1,4 +1,5 @@
 from clearwater_data.variables.base import Variable
+from clearwater_data import ArrayLike
 from datetime import datetime
 
 
@@ -50,6 +51,19 @@ class VariableRegistry:
             )
 
         return variable.get_at_time(time)
+
+    def set_at_time(self, key: str, time: datetime, value: ArrayLike) -> None:
+        """
+        Helper function to find variable by key and call the set_at_time method.
+        """
+        variable: Variable | None = None
+        try:
+            variable = self._registry[key]
+        except KeyError:
+            raise ValueError(
+                f"Variable {key} not found in registry. Did you forget to register a variable?"
+            )
+        return variable.set_at_time(time, value)
 
     def __contains__(self, key: str) -> bool:
         return key in self._registry

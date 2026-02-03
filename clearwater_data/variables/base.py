@@ -30,6 +30,18 @@ class Variable(ABC):
         """
         raise NotImplementedError
 
+    def set(self, value: ArrayLike) -> None:
+        """
+        Set the variable's value
+        """
+        raise NotImplementedError
+
+    def set_at_time(self, time: datetime, value: ArrayLike) -> None:
+        """
+        Set the variable's value at a specific time
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def resample(
         self,

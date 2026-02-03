@@ -24,6 +24,16 @@ class DataArrayVariable(Variable):
         # otherwise return the value
         return self.data_array
 
+    def set(self, value: xr.DataArray) -> None:
+        self.data_array = value
+
+    def set_at_time(self, time: datetime, value: xr.DataArray) -> None:
+        data = self.get_at_time(time)
+
+        # TODO check this approach with Sarah
+        # This works and modified the value inplace, but is this really the best practice?
+        data *= 0 + value
+
     def resample(
         self,
         new_time_frequency: datetime,

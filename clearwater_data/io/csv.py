@@ -12,20 +12,30 @@ class CSVDataSource:
         # self.interpolation_method = kwargs.pop("interpolation_method", "linear")
         self.__data: ArrayLike | None = None
 
+    def __load(self) -> None:
+        df = pd.read_csv(self.file_path)
+        self.df = df
+
+        if self.time_field is not None:
+            df = df.rename(columns={self.time_field: "time"})
+            df["time"] = pd.to_datetime(df["time"])
+
+        # If spatial field is defined, set a multi-index for [time, spatial]
+        if self.time_field is not None and self.spatial_field is not None:
+            df = df.set_index(["time", self.spatial_field])
+        elif self.spatial_field is not None:
+            df = df.set_index(self.spatial_field)
+        else:
+            # TODO: handle case with no index set
+            df = df.set_index("time")
+
+        self.__data = df.to_xarray()
+
     def read(self, parameter_name: str) -> DataArrayVariable:
         # load data if we don't have it cached
         if self.__data is None:
-            df = pd.read_csv(self.file_path)
+            self.__load()
 
-            df = df.rename(columns={self.time_field: "time"})
-            df["time"] = pd.to_datetime(df["time"])
-            
-            # If spatial field is defined, set a multi-index for [time, spatial]
-            if self.spatial_field is not None and self.spatial_field in df.columns:
-                df = df.set_index(["time", self.spatial_field])
-            else:
-                df = df.set_index("time")
-
-            self.__data = df.to_xarray()
-
-        return DataArrayVariable(self.__data[parameter_name], "time")
+        return DataArrayVariable(
+            self.__data[parameter_name], "time" if self.time_field is not None else None
+        )
