@@ -29,10 +29,7 @@ class DataArrayVariable(Variable):
 
     def set_at_time(self, time: datetime, value: xr.DataArray) -> None:
         data = self.get_at_time(time)
-
-        # TODO check this approach with Sarah
-        # This works and modified the value inplace, but is this really the best practice?
-        data *= 0 + value
+        data[:] = value
 
     def resample(
         self,

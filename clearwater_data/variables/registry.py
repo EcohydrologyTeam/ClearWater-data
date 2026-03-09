@@ -52,6 +52,19 @@ class VariableRegistry:
 
         return variable.get_at_time(time)
 
+    def set(self, key: str, value: ArrayLike) -> None:
+        """
+        Helper function to find a variable by key and call the set method.
+        """
+        variable: Variable | None = None
+        try:
+            variable = self._registry[key]
+        except KeyError:
+            raise ValueError(
+                f"Variable {key} not found in registry. Did you forget to register a variable?"
+            )
+        return variable.set(value)       
+
     def set_at_time(self, key: str, time: datetime, value: ArrayLike) -> None:
         """
         Helper function to find variable by key and call the set_at_time method.
