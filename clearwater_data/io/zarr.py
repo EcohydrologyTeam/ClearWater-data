@@ -5,6 +5,7 @@ import xarray as xr
 import dask.array as da
 import pandas as pd
 from clearwater_data.variables.xarray import DataArrayVariable
+from clearwater_data.variables import Variable
 
 
 class ZarrDataSource:
@@ -24,8 +25,18 @@ class ZarrDataStore:
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
 
-        self.spatial_field: str | None = kwargs.pop("spatial_field", None)
-        self.spatial_field_values = kwargs.pop("spatial_field_values", None)
+        # TODO: we should rename these to space to be consistent with variable definitions
+        # add in deprecation warning for the old names
+        self.spatial_field: str | list[str] | None = kwargs.pop("spatial_field", None)
+        self.spatial_field_values: ArrayLike | list[ArrayLike] | None = kwargs.pop(
+            "spatial_field_values", None
+        )
+
+        if isinstance(self.spatial_field, str) and isinstance(
+            self.spatial_field_values, ArrayLike
+        ):
+            self.spatial_field = [self.spatial_field]
+            self.spatial_field_values = [self.spatial_field_values]
 
         self._init_zarr_store()
 
@@ -36,15 +47,18 @@ class ZarrDataStore:
         coords = {"time": self.time}
 
         if self.spatial_field is not None and self.spatial_field_values is not None:
-            dims = ("time", self.spatial_field)
-            shape = (self.time.shape[0], len(self.spatial_field_values))
-            coords[self.spatial_field] = self.spatial_field_values
+            # TODO: ask Sarah if this needs to be a tuple?
+            for name, value in zip(self.spatial_field, self.spatial_field_values):
+                dims = (*dims, name)
+                shape = (*shape, len(value))
+                coords[name] = value
 
         return dims, shape, coords
 
     def _init_zarr_store(self) -> None:
         dims, shape, coords = self._parse_zarr_coordinates()
 
+        # needs to be updated to support format
         template_dataset = xr.Dataset(
             {v: (dims, da.empty(shape, dtype="float")) for v in self.variables},
             coords=coords,
@@ -56,7 +70,8 @@ class ZarrDataStore:
         )
 
     def write(self, data: ArrayLike, parameter_name: str) -> None:
-        data.to_zarr(self.store_path, mode="a", consolidated=False)
+        prt = data.to_zarr(self.store_path, mode="a", consolidated=False, compute=True)
+        return None
 
 
 class ChunkedZarrDataStore(ZarrDataStore):

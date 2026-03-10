@@ -8,6 +8,7 @@ class FloatVariable(Variable):
     """
 
     time_dimension = None
+    space_dimension = None
 
     def __init__(self, value: float):
         self.value = value
