@@ -27,6 +27,13 @@ class VariableRegistry:
         """
         if key in self._registry:
             del self._registry[key]
+    
+    def get_space_dimension(self, key: str) -> str | list[str] | None:
+        try:
+            variable = self._registry[key]
+        except KeyError:
+            raise ValueError(f"Variable {key} not found.")
+        return variable.space_dimension
 
     def get_variable(self, key: str) -> Variable:
         """
