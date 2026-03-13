@@ -5,7 +5,11 @@ import xarray as xr
 import dask.array as da
 import pandas as pd
 from clearwater_data.variables.xarray import DataArrayVariable
-from clearwater_data.variables import Variable
+
+
+from logging import getLogger
+
+LOGGER = getLogger(__name__)
 
 
 class ZarrDataSource:
@@ -109,9 +113,9 @@ class ChunkedZarrDataStore(ZarrDataStore):
         start_time: datetime,
         end_time: datetime,
     ) -> None:
-        # parse time indices
-        start_index = self.time.get_loc(start_time)
-        end_index = self.time.get_loc(end_time)
+        LOGGER.debug(
+            f"Writing chunk for {parameter_name} from {start_time} to {end_time} to zarr store at {self.store_path}"
+        )
 
         # prepare main variable slice; drop auxiliary coordinates
         data_clean = data.drop_vars(
@@ -122,6 +126,8 @@ class ChunkedZarrDataStore(ZarrDataStore):
             self.store_path,
             # group=parameter_name,
             mode="a",
-            region={"time": slice(start_index, end_index + 1)},
+            # region={"time": slice(start_index, end_index + 1)},
             consolidated=False,
+            region="auto",
+            compute=True,
         )
