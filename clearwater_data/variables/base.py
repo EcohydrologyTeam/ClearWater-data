@@ -14,28 +14,28 @@ class Variable(ABC):
         """
         Get the time dimension of the variable.
         """
-        raise None
-
-    @property
-    def space_dimension(self) -> str | list[str] | None:
-        """
-        Get the space dimension(s) of the variable.
-        """
-        raise None
+        return None
 
     @property
     def time_dimension_values(self) -> ArrayLike | None:
         """
         Get the time dimension values of the variable.
         """
-        raise None
+        return None
+
+    @property
+    def space_dimension(self) -> str | list[str] | None:
+        """
+        Get the space dimension(s) of the variable.
+        """
+        return None
 
     @property
     def space_dimension_values(self) -> ArrayLike | None:
         """
         Get the space dimension(s) values of the variable.
         """
-        raise None
+        return None
 
     @abstractmethod
     def get(self) -> ArrayLike:
