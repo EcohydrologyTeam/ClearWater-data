@@ -10,13 +10,34 @@ class Variable(ABC):
     """
 
     @property
-    @abstractmethod
     def time_dimension(self) -> str | None:
         """
         Get the time dimension of the variable.
         """
-        raise NotImplementedError
+        return None
 
+    @property
+    def time_dimension_values(self) -> ArrayLike | None:
+        """
+        Get the time dimension values of the variable.
+        """
+        return None
+
+    @property
+    def space_dimension(self) -> str | list[str] | None:
+        """
+        Get the space dimension(s) of the variable.
+        """
+        return None
+
+    @property
+    def space_dimension_values(self) -> ArrayLike | None:
+        """
+        Get the space dimension(s) values of the variable.
+        """
+        return None
+
+    @abstractmethod
     def get(self) -> ArrayLike:
         """
         Get a reference to the variable's value
@@ -27,6 +48,20 @@ class Variable(ABC):
     def get_at_time(self, time: datetime) -> ArrayLike:
         """
         Get a reference to the variable's value at a specific time
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def set(self, value: ArrayLike) -> None:
+        """
+        Set the variable's value
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def set_at_time(self, time: datetime, value: ArrayLike) -> None:
+        """
+        Set the variable's value at a specific time
         """
         raise NotImplementedError
 
@@ -56,5 +91,4 @@ class Variable(ABC):
         raise NotImplementedError
 
     # TODO: Consider the notion of units in the context of a variable
-    # look at metpy
-    # look at pint
+    # look at `metpy` or `pint` for approaches or inspiration

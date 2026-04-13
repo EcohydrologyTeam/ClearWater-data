@@ -7,10 +7,15 @@ import pandas as pd
 from clearwater_data.variables.xarray import DataArrayVariable
 
 
+from logging import getLogger
+
+LOGGER = getLogger(__name__)
+
+
 class ZarrDataSource:
     def __init__(self, **kwargs) -> None:
         self.store_path: Path = kwargs.pop("store_path")
-        self.__dataset = xr.open_zarr(self.store_path)
+        self.__dataset = xr.open_zarr(self.store_path, consolidated=False)
 
     def read(self, parameter_name: str) -> DataArrayVariable:
         return DataArrayVariable(self.__dataset[parameter_name].compute())
@@ -24,8 +29,18 @@ class ZarrDataStore:
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
 
-        self.spatial_field: str | None = kwargs.pop("spatial_field", None)
-        self.spatial_field_values = kwargs.pop("spatial_field_values", None)
+        # TODO: we should rename these to space to be consistent with variable definitions
+        # add in deprecation warning for the old names
+        self.spatial_field: str | list[str] | None = kwargs.pop("spatial_field", None)
+        self.spatial_field_values: ArrayLike | list[ArrayLike] | None = kwargs.pop(
+            "spatial_field_values", None
+        )
+
+        if isinstance(self.spatial_field, str) and isinstance(
+            self.spatial_field_values, ArrayLike
+        ):
+            self.spatial_field = [self.spatial_field]
+            self.spatial_field_values = [self.spatial_field_values]
 
         self._init_zarr_store()
 
@@ -36,43 +51,38 @@ class ZarrDataStore:
         coords = {"time": self.time}
 
         if self.spatial_field is not None and self.spatial_field_values is not None:
+            # TODO: ask Sarah if this needs to be a tuple?
+            for name, value in zip(self.spatial_field, self.spatial_field_values):
+                dims = (*dims, name)
+                shape = (*shape, len(value))
+                coords[name] = value
 
-            dims = ("time", self.spatial_field)
-            shape = (self.time.shape[0], len(self.spatial_field_values))
-            coords[self.spatial_field] = self.spatial_field_values
-        
         return dims, shape, coords
-
 
     def _init_zarr_store(self) -> None:
         dims, shape, coords = self._parse_zarr_coordinates()
 
+        # needs to be updated to support format
         template_dataset = xr.Dataset(
-            {
-                v: (dims, da.empty(shape, dtype="float"))
-                for v in self.variables
-            },
+            {v: (dims, da.empty(shape, dtype="float")) for v in self.variables},
             coords=coords,
         )
 
         # write the template out to generate zarr
         template_dataset.to_zarr(
-            self.store_path,
-            mode="w",
-            compute=False,
-            zarr_format=3,
-            consolidated=False
+            self.store_path, mode="w", compute=False, zarr_format=3, consolidated=False
         )
 
     def write(self, data: ArrayLike, parameter_name: str) -> None:
-        data.to_zarr(self.store_path, mode="a", consolidated=False)
+        prt = data.to_zarr(self.store_path, mode="a", consolidated=False, compute=True)
+        return None
 
 
 class ChunkedZarrDataStore(ZarrDataStore):
     def __init__(self, **kwargs) -> None:
         self.chunk_size: timedelta = kwargs.pop("chunk_size")
         super().__init__(**kwargs)
-    
+
     def _init_zarr_store(self) -> None:
         dims, shape, coords = self._parse_zarr_coordinates()
 
@@ -93,11 +103,7 @@ class ChunkedZarrDataStore(ZarrDataStore):
 
         # write the template out to generate zarr
         template_dataset.to_zarr(
-            self.store_path,
-            mode="w",
-            compute=False,
-            zarr_format=3,
-            consolidated=False
+            self.store_path, mode="w", compute=False, zarr_format=3, consolidated=False
         )
 
     def write_chunk(
@@ -107,19 +113,21 @@ class ChunkedZarrDataStore(ZarrDataStore):
         start_time: datetime,
         end_time: datetime,
     ) -> None:
-        # parse time indices
-        start_index = self.time.get_loc(start_time)
-        end_index = self.time.get_loc(end_time)
+        LOGGER.debug(
+            f"Writing chunk for {parameter_name} from {start_time} to {end_time} to zarr store at {self.store_path}"
+        )
 
         # prepare main variable slice; drop auxiliary coordinates
-        data_clean = data.drop_vars([
-            c for c in data.coords if c!= "time" and c != self.spatial_field
-        ])
+        data_clean = data.drop_vars(
+            [c for c in data.coords if c != "time" and c != self.spatial_field]
+        )
 
         data_clean.to_zarr(
             self.store_path,
             # group=parameter_name,
             mode="a",
-            region={"time": slice(start_index, end_index + 1)},
-            consolidated=False
+            # region={"time": slice(start_index, end_index + 1)},
+            consolidated=False,
+            region="auto",
+            compute=True,
         )

@@ -8,6 +8,7 @@ class FloatVariable(Variable):
     """
 
     time_dimension = None
+    space_dimension = None
 
     def __init__(self, value: float):
         self.value = value
@@ -24,6 +25,19 @@ class FloatVariable(Variable):
         """
         # single floating value is time independent
         return self.get()
+
+    def set(self, value: float) -> None:
+        """
+        Set the variable's value
+        """
+        self.value = value
+
+    def set_at_time(self, time: datetime, value: float) -> None:
+        """
+        Set the variable's value at a specific time
+        """
+        # single floating value is time independent
+        self.set(value)
 
     def resample(
         self,

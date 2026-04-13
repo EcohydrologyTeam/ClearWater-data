@@ -24,7 +24,7 @@ path = "./README.md"
 
 [tool.pixi.workspace]
 channels = ["conda-forge"]
-platforms = ["win-64"]
+platforms = ["win-64","linux-64"]
 
 [tool.pixi.pypi-dependencies]
 clearwater_data = { path = ".", editable = true }

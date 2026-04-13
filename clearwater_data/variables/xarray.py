@@ -5,14 +5,22 @@ from datetime import datetime
 
 class DataArrayVariable(Variable):
     def __init__(
-        self, data_array: xr.DataArray, time_dimension: str | None = "time"
+        self,
+        data_array: xr.DataArray,
+        time_dimension: str | None = "time",
+        space_dimension: str | list[str] | None = None,
     ) -> None:
         self.data_array = data_array
         self.__time_dimension = time_dimension
+        self.__space_dimension = space_dimension
 
     @property
     def time_dimension(self) -> str | None:
         return self.__time_dimension
+
+    @property
+    def space_dimension(self) -> str | list[str] | None:
+        return self.__space_dimension
 
     def get(self) -> xr.DataArray:
         return self.data_array
@@ -23,6 +31,13 @@ class DataArrayVariable(Variable):
             return self.data_array.sel({self.time_dimension: time})
         # otherwise return the value
         return self.data_array
+
+    def set(self, value: xr.DataArray) -> None:
+        self.data_array = value
+
+    def set_at_time(self, time: datetime, value: xr.DataArray) -> None:
+        data = self.get_at_time(time)
+        data[:] = value
 
     def resample(
         self,
