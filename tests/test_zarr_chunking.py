@@ -122,3 +122,61 @@ def test_chunked_data_source_inherited_eager_read_unchanged(tmp_path):
     da = src.read("concentration").get()
     assert da.sizes["time"] == len(times)
     np.testing.assert_array_equal(da.values, full.values)
+
+
+def test_chunked_store_init_template_false_preserves_existing(tmp_path):
+    """``init_template=False`` keeps an existing store intact (Phase-C C3b).
+
+    A resumed riverine run reconstructs its model with the same output
+    ``store_path``; the default ``mode="w"`` template init would clobber
+    the chunks already written by the original run. With
+    ``init_template=False``, construction must skip the template write,
+    leave the store byte-identical, and subsequent ``write_chunk(...,
+    region="auto")`` calls must keep appending into the existing
+    pre-allocated extent.
+    """
+    n_cells = 5
+    start, end = datetime(2023, 1, 1, 0, 0), datetime(2023, 1, 1, 1, 0)
+    step = timedelta(minutes=15)
+    _store1, times, full = _build_store(tmp_path, n_cells, start, end, step)
+
+    # Snapshot the original store contents.
+    before = xr.open_zarr(tmp_path / "store.zarr", consolidated=False)
+    before_vals = before["concentration"].values.copy()
+    np.testing.assert_array_equal(before_vals, full.values)
+
+    # Re-construct WITHOUT clobbering (the resume path).
+    store2 = ChunkedZarrDataStore(
+        store_path=tmp_path / "store.zarr",
+        start_date=start,
+        end_date=end,
+        time_step=step,
+        chunk_size=timedelta(minutes=30),
+        variables=["concentration"],
+        spatial_field=["nface"],
+        spatial_field_values=[np.arange(n_cells)],
+        init_template=False,
+    )
+
+    # Existing data must still be there, byte-identical.
+    after = xr.open_zarr(tmp_path / "store.zarr", consolidated=False)
+    np.testing.assert_array_equal(after["concentration"].values, before_vals)
+
+    # And the re-constructed store must still accept new writes via the
+    # same region="auto" path: overwrite the last window with sentinel
+    # values and confirm the read-back reflects it.
+    sentinel = xr.DataArray(
+        np.full((2, n_cells), -42.0, dtype="float"),
+        dims=("time", "nface"),
+        coords={"time": times[-2:], "nface": np.arange(n_cells)},
+        name="concentration",
+    )
+    store2.write_chunk(sentinel, "concentration", times[-2], times[-1])
+    final = xr.open_zarr(tmp_path / "store.zarr", consolidated=False)
+    np.testing.assert_array_equal(
+        final["concentration"].values[-2:], np.full((2, n_cells), -42.0)
+    )
+    # Earlier slots unchanged.
+    np.testing.assert_array_equal(
+        final["concentration"].values[:-2], before_vals[:-2]
+    )

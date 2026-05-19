@@ -51,6 +51,13 @@ class ZarrDataStore:
         self.end_date: datetime = kwargs.pop("end_date")
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
+        # When False, skip the mode="w" template init so an existing store
+        # at ``store_path`` is preserved. Required for the riverine
+        # checkpoint/resume path (Phase-C C3b): a resumed run must continue
+        # writing into the same pre-allocated store rather than clobbering
+        # the chunks already written by the original run. Default True keeps
+        # existing callers unchanged.
+        init_template: bool = kwargs.pop("init_template", True)
 
         # TODO: we should rename these to space to be consistent with variable definitions
         # add in deprecation warning for the old names
@@ -65,7 +72,8 @@ class ZarrDataStore:
             self.spatial_field = [self.spatial_field]
             self.spatial_field_values = [self.spatial_field_values]
 
-        self._init_zarr_store()
+        if init_template:
+            self._init_zarr_store()
 
     def _parse_zarr_coordinates(self):
         self.time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
