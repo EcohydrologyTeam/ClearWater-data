@@ -86,12 +86,12 @@ class ChunkedZarrDataStore(ZarrDataStore):
     def _init_zarr_store(self) -> None:
         dims, shape, coords = self._parse_zarr_coordinates()
 
-        # set chunks
+        # set chunks: chunk along time only; keep the full spatial extent in
+        # one chunk. `shape` == (n_time, *spatial_extents) from
+        # _parse_zarr_coordinates; the previous len(self.spatial_field_values)
+        # counted spatial *fields* (~1), not spatial *points* (B2).
         chunk_length = int(self.chunk_size / self.time_step)
-        if self.spatial_field is not None and self.spatial_field_values is not None:
-            chunks = (chunk_length, len(self.spatial_field_values))
-        else:
-            chunks = (chunk_length,)
+        chunks = (chunk_length, *shape[1:])
 
         template_dataset = xr.Dataset(
             {
