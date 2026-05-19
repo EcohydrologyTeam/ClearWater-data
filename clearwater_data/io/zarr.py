@@ -21,6 +21,29 @@ class ZarrDataSource:
         return DataArrayVariable(self.__dataset[parameter_name].compute())
 
 
+class ChunkedZarrDataSource(ZarrDataSource):
+    """Chunked (windowed) reader satisfying the ChunkedDataSource protocol.
+
+    Lazily opens the Zarr store and materializes ONLY the requested
+    [start_time, end_time] window, so resident memory is bounded by the
+    window rather than the whole variable. Additive: ``ZarrDataSource`` and
+    its eager ``read`` (inherited unchanged) are not modified, so existing
+    consumers of ``ZarrDataSource``/``read`` are unaffected (B1).
+    """
+
+    def read_chunk(
+        self,
+        parameter_name: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> DataArrayVariable:
+        # Lazy open (metadata only); materialize ONLY the requested window
+        # so resident memory is bounded by the window, not the whole array.
+        dataset = xr.open_zarr(self.store_path, consolidated=False)
+        window = dataset[parameter_name].sel(time=slice(start_time, end_time))
+        return DataArrayVariable(window.compute())
+
+
 class ZarrDataStore:
     def __init__(self, **kwargs) -> None:
         self.store_path: Path = kwargs.pop("store_path")
