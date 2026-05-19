@@ -113,7 +113,16 @@ class ChunkedZarrDataStore(ZarrDataStore):
         # one chunk. `shape` == (n_time, *spatial_extents) from
         # _parse_zarr_coordinates; the previous len(self.spatial_field_values)
         # counted spatial *fields* (~1), not spatial *points* (B2).
-        chunk_length = int(self.chunk_size / self.time_step)
+        #
+        # chunk_size must be an exact integer multiple of time_step; otherwise
+        # int(chunk_size / time_step) would silently truncate to a wrong chunk
+        # grid. Use exact timedelta arithmetic and fail loudly instead (A3).
+        if self.chunk_size % self.time_step != timedelta(0):
+            raise ValueError(
+                f"chunk_size ({self.chunk_size}) must be an integer multiple "
+                f"of time_step ({self.time_step})."
+            )
+        chunk_length = self.chunk_size // self.time_step
         chunks = (chunk_length, *shape[1:])
 
         template_dataset = xr.Dataset(

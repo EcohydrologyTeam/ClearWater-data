@@ -10,6 +10,10 @@ B1 (test_chunked_data_source_*): ChunkedZarrDataSource.read_chunk returns only
 the requested [start, end] window (bounded memory), satisfies the
 ChunkedDataSource protocol, and leaves the inherited eager read() unchanged.
 
+A3 (test_chunked_store_rejects_non_multiple_chunk_size): chunk_size that is
+not an exact integer multiple of time_step must fail loudly rather than
+silently truncate to a wrong chunk grid.
+
 clearwater_data has no standalone test env; run via a consumer env:
   (cd ../ClearWater-riverine && \
    pixi run -e dev python -m pytest ../ClearWater-data/tests/test_zarr_chunking.py)
@@ -18,6 +22,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
+import pytest
 import xarray as xr
 
 from clearwater_data.io.base import ChunkedDataSource
@@ -40,6 +45,22 @@ def test_chunked_store_spatial_chunk_is_full_extent(tmp_path):
     chunks = ds["concentration"].chunksizes
     assert chunks["nface"] == (n_cells,), chunks["nface"]
     assert chunks["time"][0] == 2, chunks["time"]
+
+
+def test_chunked_store_rejects_non_multiple_chunk_size(tmp_path):
+    # 25 min is not an integer multiple of a 15 min step -> must raise (A3),
+    # not silently truncate int(25/15)=1.
+    with pytest.raises(ValueError, match="integer multiple"):
+        ChunkedZarrDataStore(
+            store_path=tmp_path / "store.zarr",
+            start_date=datetime(2023, 1, 1, 0, 0),
+            end_date=datetime(2023, 1, 1, 1, 0),
+            time_step=timedelta(minutes=15),
+            chunk_size=timedelta(minutes=25),
+            variables=["concentration"],
+            spatial_field=["nface"],
+            spatial_field_values=[np.arange(3)],
+        )
 
 
 def _build_store(tmp_path, n_cells, start, end, step):
