@@ -51,6 +51,20 @@ class ZarrDataStore:
         self.end_date: datetime = kwargs.pop("end_date")
         self.time_step: timedelta = kwargs.pop("time_step")
         self.variables: list[str] = kwargs.pop("variables")
+        # Phase G-4 (2026-05-21): accept an explicit time-coord vector
+        # rather than synthesizing a uniform grid from
+        # (start_date, end_date, time_step). When supplied, the
+        # actual stamps the caller intends to write are used as the
+        # template's time axis. This is required when the upstream
+        # data (e.g., HEC-RAS HDF outputs) carries non-uniform time
+        # stamps; otherwise the chunk write attempts to land on stamps
+        # that do not exist in the uniform template and either raises
+        # ``KeyError`` (newer xarray) or silently leaves slots NaN
+        # (older xarray). Default ``None`` preserves the original
+        # behavior of ``pd.date_range(start, end, freq=time_step)``.
+        self.time_coord: pd.DatetimeIndex | None = kwargs.pop("time_coord", None)
+        if self.time_coord is not None:
+            self.time_coord = pd.DatetimeIndex(self.time_coord)
         # When False, skip the mode="w" template init so an existing store
         # at ``store_path`` is preserved. Required for the riverine
         # checkpoint/resume path (Phase-C C3b): a resumed run must continue
@@ -76,7 +90,17 @@ class ZarrDataStore:
             self._init_zarr_store()
 
     def _parse_zarr_coordinates(self):
-        self.time = pd.date_range(self.start_date, self.end_date, freq=self.time_step)
+        # Phase G-4 (2026-05-21): prefer the caller-supplied
+        # time_coord (actual stamps) over the synthesized
+        # uniform-grid date_range so chunk writes against
+        # non-uniform RAS time series land on stamps the template
+        # actually contains.
+        if self.time_coord is not None:
+            self.time = self.time_coord
+        else:
+            self.time = pd.date_range(
+                self.start_date, self.end_date, freq=self.time_step,
+            )
         dims = ("time",)
         shape = (self.time.shape[0],)
         coords = {"time": self.time}
@@ -157,9 +181,22 @@ class ChunkedZarrDataStore(ZarrDataStore):
             f"Writing chunk for {parameter_name} from {start_time} to {end_time} to zarr store at {self.store_path}"
         )
 
-        # prepare main variable slice; drop auxiliary coordinates
+        # prepare main variable slice; drop auxiliary coordinates.
+        #
+        # Phase G-5 (2026-05-21): use set-membership against the
+        # normalized spatial_field list rather than ``c != self.spatial_field``
+        # which compares a string coord-name to a list and is always
+        # True. The previous form stripped the spatial coord on every
+        # chunk write; latent because tests did not attach auxiliary
+        # coords. ``self.spatial_field`` is promoted to a list at
+        # ``__init__`` time when it arrives as a string.
+        spatial_fields = (
+            self.spatial_field if isinstance(self.spatial_field, list)
+            else ([self.spatial_field] if self.spatial_field is not None else [])
+        )
+        keep = {"time", *spatial_fields}
         data_clean = data.drop_vars(
-            [c for c in data.coords if c != "time" and c != self.spatial_field]
+            [c for c in data.coords if c not in keep]
         )
 
         data_clean.to_zarr(
