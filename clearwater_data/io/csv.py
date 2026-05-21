@@ -9,6 +9,14 @@ class CSVDataSource:
         self.file_path: Path = kwargs.pop("file_path")
         self.time_field: str = kwargs.pop("time_field", None)
         self.spatial_field: str = kwargs.pop("spatial_field", None)
+        # Phase F (2026-05-21): allow the CSV to carry a universal
+        # value-column name (e.g. the streaming fork's per-constituent
+        # CSVs use ``Concentration`` as the column header for all
+        # constituents). ``value_field`` specifies that universal column
+        # name; ``read(parameter_name)`` returns it regardless of how
+        # the caller refers to the constituent. Default ``None``
+        # preserves the prior contract of column-name == parameter-name.
+        self.value_field: str = kwargs.pop("value_field", None)
         # self.interpolation_method = kwargs.pop("interpolation_method", "linear")
         self.__data: ArrayLike | None = None
 
@@ -36,6 +44,10 @@ class CSVDataSource:
         if self.__data is None:
             self.__load()
 
+        # Phase F: prefer ``value_field`` (universal column name) when
+        # set; fall back to the parameter name otherwise.
+        lookup = self.value_field if self.value_field is not None else parameter_name
+
         return DataArrayVariable(
-            self.__data[parameter_name], "time" if self.time_field is not None else None
+            self.__data[lookup], "time" if self.time_field is not None else None
         )
