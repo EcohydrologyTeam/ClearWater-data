@@ -129,8 +129,19 @@ class ZarrDataStore:
         )
 
     def write(self, data: ArrayLike, parameter_name: str) -> None:
-        prt = data.to_zarr(self.store_path, mode="a", consolidated=False, compute=True)
-        return None
+        """Append ``data`` to the pre-allocated template under ``parameter_name``.
+
+        Phase H-11 (2026-05-21): if ``data.name != parameter_name``,
+        rename the DataArray before writing so the value lands in the
+        intended slot of the template. Previously ``parameter_name``
+        was accepted but ignored; the target variable was whatever
+        ``data.name`` happened to carry, so a caller's safe-looking
+        ``store.write(da, 'concentration')`` could land the values
+        under a different name with no diagnostic.
+        """
+        if hasattr(data, "name") and data.name != parameter_name:
+            data = data.rename(parameter_name)
+        data.to_zarr(self.store_path, mode="a", consolidated=False, compute=True)
 
 
 class ChunkedZarrDataStore(ZarrDataStore):

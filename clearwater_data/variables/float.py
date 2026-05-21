@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from clearwater_data.variables.base import Variable
 from datetime import datetime, timedelta
 
@@ -19,11 +21,17 @@ class FloatVariable(Variable):
         """
         return self.value
 
-    def get_at_time(self, time: datetime) -> float:
+    def get_at_time(
+        self,
+        time: datetime,
+        tolerance: timedelta | None = None,
+    ) -> float:
+        """Return the scalar value (time-independent).
+
+        Phase H-13 (2026-05-21): ``tolerance`` is accepted for
+        signature parity with the base class but has no effect here
+        (the scalar is time-independent by definition).
         """
-        Get a reference to the variable's value at a specific time
-        """
-        # single floating value is time independent
         return self.get()
 
     def set(self, value: float) -> None:
@@ -33,11 +41,22 @@ class FloatVariable(Variable):
         self.value = value
 
     def set_at_time(self, time: datetime, value: float) -> None:
+        """Reject per-time set: FloatVariable is time-independent.
+
+        Phase H-15 (2026-05-21): previously this method silently
+        discarded the ``time`` argument and mutated the global scalar
+        via ``self.set(value)``. A caller building a per-time sequence
+        of FloatVariable updates would see only the LAST value persist,
+        with no diagnostic. Raise loudly instead so the contract is
+        explicit. Callers who genuinely want to update the scalar
+        globally should call ``set(value)`` directly.
         """
-        Set the variable's value at a specific time
-        """
-        # single floating value is time independent
-        self.set(value)
+        raise NotImplementedError(
+            "FloatVariable.set_at_time is unsupported because FloatVariable "
+            "stores a single time-independent scalar. The 'time' argument "
+            "would be silently ignored if accepted, masking per-time-set bugs. "
+            "Call set(value) directly to update the scalar globally."
+        )
 
     def resample(
         self,

@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from clearwater_data.variables.base import Variable
 import xarray as xr
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 class DataArrayVariable(Variable):
@@ -25,11 +27,38 @@ class DataArrayVariable(Variable):
     def get(self) -> xr.DataArray:
         return self.data_array
 
-    def get_at_time(self, time: datetime) -> xr.DataArray:
-        # if data a has time dimension, return the value at that time
-        if "time" in self.data_array.dims:
+    def get_at_time(
+        self,
+        time: datetime,
+        tolerance: timedelta | None = None,
+    ) -> xr.DataArray:
+        """Return the time slice at ``time`` (or the full array if no time dim).
+
+        Phase H-12 (2026-05-21): the guard now checks
+        ``self.time_dimension`` consistently rather than the literal
+        ``"time"``. Previously the guard tested ``"time" in dims`` while
+        the .sel used ``self.time_dimension``: when the underlying
+        DataArray used any other time-dim name (e.g., ``"stamp"``), the
+        guard was False and the method returned the FULL array instead
+        of the requested slice -- a silent correctness failure.
+
+        Phase H-13 (2026-05-21): the optional ``tolerance`` kwarg, when
+        non-None, switches the underlying ``.sel`` to ``method='nearest'``
+        with the given tolerance. Default ``None`` preserves exact-match
+        behaviour so existing callers that rely on byte-identical time
+        stamps continue to raise on mismatch.
+        """
+        if (
+            self.time_dimension is not None
+            and self.time_dimension in self.data_array.dims
+        ):
+            if tolerance is not None:
+                return self.data_array.sel(
+                    {self.time_dimension: time},
+                    method="nearest",
+                    tolerance=tolerance,
+                )
             return self.data_array.sel({self.time_dimension: time})
-        # otherwise return the value
         return self.data_array
 
     def set(self, value: xr.DataArray) -> None:

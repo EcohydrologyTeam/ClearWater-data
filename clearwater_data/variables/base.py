@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 from clearwater_data import ArrayLike
@@ -45,9 +47,20 @@ class Variable(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_at_time(self, time: datetime) -> ArrayLike:
-        """
-        Get a reference to the variable's value at a specific time
+    def get_at_time(
+        self,
+        time: datetime,
+        tolerance: timedelta | None = None,
+    ) -> ArrayLike:
+        """Return the variable's value at a specific time.
+
+        Phase H-13 (2026-05-21): the optional ``tolerance`` kwarg, when
+        non-None, switches the underlying selection to nearest-time
+        with the given tolerance. Default ``None`` preserves
+        exact-match behaviour for backward compatibility with existing
+        callers that have always relied on label-based indexing.
+
+        Subclasses that have no time dimension may ignore the kwarg.
         """
         raise NotImplementedError
 

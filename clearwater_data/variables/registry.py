@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 from clearwater_data.variables.base import Variable
 from clearwater_data import ArrayLike
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import warnings
 
@@ -52,10 +54,17 @@ class VariableRegistry:
         """
         Retrieve a variable by key.
         """
+        # Phase H-14 (2026-05-21): the deprecation message previously
+        # referenced a ``get_data`` method that does not exist on
+        # ``Variable`` (the actual method is ``get``). The corrected
+        # guidance is ``registry.get_variable(key).get()``. Also adds
+        # ``stacklevel=2`` so the warning is annotated at the caller's
+        # line, not registry.py.
         warnings.warn(
-            DeprecationWarning(
-                "The get method is deprecated. Use get_variable instead and call get_data on the variable."
-            )
+            "VariableRegistry.get is deprecated; "
+            "use get_variable(key).get() instead.",
+            DeprecationWarning,
+            stacklevel=2,
         )
         try:
             variable = self._registry[key]
@@ -64,9 +73,19 @@ class VariableRegistry:
 
         return variable.get()
 
-    def get_at_time(self, key: str, time: datetime) -> ArrayLike:
-        """
-        Retrieve a variable by key and time.
+    def get_at_time(
+        self,
+        key: str,
+        time: datetime,
+        tolerance: timedelta | None = None,
+    ) -> ArrayLike:
+        """Retrieve a variable's value at a specific time.
+
+        Phase H-13 (2026-05-21): the optional ``tolerance`` kwarg
+        threads through to ``Variable.get_at_time``; when non-None,
+        the underlying selection uses ``method='nearest'`` with the
+        given tolerance. Default ``None`` preserves exact-match
+        behaviour.
         """
         variable: Variable | None = None
         try:
@@ -76,7 +95,7 @@ class VariableRegistry:
                 f"Variable {key} not found in registry. Did you forget to register a variable?"
             )
 
-        return variable.get_at_time(time)
+        return variable.get_at_time(time, tolerance=tolerance)
 
     def set(self, key: str, value: ArrayLike) -> None:
         """
