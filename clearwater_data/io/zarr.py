@@ -37,9 +37,30 @@ class ChunkedZarrDataSource(ZarrDataSource):
         start_time: datetime,
         end_time: datetime,
     ) -> DataArrayVariable:
+        """Read the [start_time, end_time] window of a stored variable.
+
+        Phase I-4 / N1 (2026-05-21): validate the request bounds.
+        Previously a request inverted ``end_time < start_time`` or
+        entirely outside the store's time extent returned a
+        zero-length DataArray silently; downstream consumers then
+        hit confusing "empty array" mystery failures. Raise loudly
+        with a clear message naming the store's actual range.
+        """
+        if end_time < start_time:
+            raise ValueError(
+                f"read_chunk: end_time ({end_time}) < start_time "
+                f"({start_time}); window is empty."
+            )
         # Lazy open (metadata only); materialize ONLY the requested window
         # so resident memory is bounded by the window, not the whole array.
         dataset = xr.open_zarr(self.store_path, consolidated=False)
+        store_t0 = pd.Timestamp(dataset.time.values[0])
+        store_tN = pd.Timestamp(dataset.time.values[-1])
+        if end_time < store_t0 or start_time > store_tN:
+            raise ValueError(
+                f"read_chunk: window [{start_time}, {end_time}] does not "
+                f"overlap the store's time extent [{store_t0}, {store_tN}]."
+            )
         window = dataset[parameter_name].sel(time=slice(start_time, end_time))
         return DataArrayVariable(window.compute())
 
@@ -85,6 +106,19 @@ class ZarrDataStore:
         ):
             self.spatial_field = [self.spatial_field]
             self.spatial_field_values = [self.spatial_field_values]
+
+        # Phase I-4 / N6 (2026-05-21): reject typos in optional
+        # kwargs. Previously a caller's typo'd kwarg (e.g.,
+        # ``inti_template=True``) was silently dropped because
+        # ``**kwargs.pop(...)`` consumed only the names this class
+        # knows about. Now any leftover kwargs raise TypeError with
+        # a list of the unexpected names so the user catches the
+        # typo at construction time.
+        if kwargs:
+            raise TypeError(
+                f"ZarrDataStore got unexpected kwargs: {sorted(kwargs)}. "
+                "Check for typos or extra arguments."
+            )
 
         if init_template:
             self._init_zarr_store()

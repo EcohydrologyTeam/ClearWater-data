@@ -65,12 +65,24 @@ class DataArrayVariable(Variable):
         self.data_array = value
 
     def set_at_time(self, time: datetime, value: xr.DataArray) -> None:
-        data = self.get_at_time(time)
-        data[:] = value
+        """Write ``value`` into the array at ``time``.
+
+        Phase I-4 / N7 (2026-05-21): handle the 1-D (time-only)
+        DataArray case explicitly. Previously ``data = self.get_at_time(time)``
+        returned a 0-d scalar and ``data[:] = value`` raised
+        ``IndexError: too many indices`` on time-only variables.
+        Now uses ``.loc`` for the 1-D case (scalar assignment) and
+        the slice-assignment for higher-dimensional cases.
+        """
+        if self.data_array.ndim == 1 and self.time_dimension is not None:
+            self.data_array.loc[{self.time_dimension: time}] = value
+        else:
+            data = self.get_at_time(time)
+            data[:] = value
 
     def resample(
         self,
-        new_time_frequency: datetime,
+        new_time_frequency: timedelta,  # Phase I-4 / NIT1: was annotated datetime
         method: str = "linear",
     ) -> None:
         if self.time_dimension is None:
@@ -85,6 +97,30 @@ class DataArrayVariable(Variable):
         start_time: datetime | None = None,
         end_time: datetime | None = None,
     ) -> None:
+        """Subset the underlying data to a time range.
+
+        Phase I-4 / N2 (2026-05-21): validate that ``start_time <=
+        end_time`` and that the underlying time axis is monotonic
+        increasing (xarray's ``.sel(slice(...))`` silently returns
+        an empty slice for descending or inverted ranges).
+        """
+        if (
+            start_time is not None
+            and end_time is not None
+            and start_time > end_time
+        ):
+            raise ValueError(
+                f"subset_time: start_time ({start_time}) > end_time "
+                f"({end_time}); slice would be empty."
+            )
+        if self.time_dimension is not None:
+            idx = self.data_array.indexes.get(self.time_dimension)
+            if idx is not None and not idx.is_monotonic_increasing:
+                raise ValueError(
+                    f"subset_time: time axis '{self.time_dimension}' is not "
+                    "monotonic increasing; slice would be empty. Sort the "
+                    "underlying DataArray first."
+                )
         if start_time is not None:
             self.data_array = self.data_array.sel(
                 {self.time_dimension: slice(start_time, None)}
