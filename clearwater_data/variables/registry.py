@@ -54,15 +54,17 @@ class VariableRegistry:
         """
         Retrieve a variable by key.
         """
-        # Phase H-14 (2026-05-21): the deprecation message previously
-        # referenced a ``get_data`` method that does not exist on
-        # ``Variable`` (the actual method is ``get``). The corrected
-        # guidance is ``registry.get_variable(key).get()``. Also adds
-        # ``stacklevel=2`` so the warning is annotated at the caller's
-        # line, not registry.py.
+        # Phase H-14 + Phase I-5 (2026-05-21): point users at
+        # ``get_data()``, the new-style accessor added in Phase I-5
+        # alongside the legacy ``get()`` method. ``get_data()`` and
+        # ``get()`` are semantically equivalent (the former is a thin
+        # alias defined in ``Variable`` that delegates to the latter);
+        # the rename is to give the deprecation message a method name
+        # that signals "data" rather than the ambiguous Python builtin
+        # ``get``.
         warnings.warn(
             "VariableRegistry.get is deprecated; "
-            "use get_variable(key).get() instead.",
+            "use get_variable(key).get_data() instead.",
             DeprecationWarning,
             stacklevel=2,
         )

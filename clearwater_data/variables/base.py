@@ -41,10 +41,30 @@ class Variable(ABC):
 
     @abstractmethod
     def get(self) -> ArrayLike:
-        """
-        Get a reference to the variable's value
+        """Return a reference to the variable's value.
+
+        Phase I-5 (2026-05-21): this is the long-standing method
+        name. ``get_data`` is the equivalent new-style accessor
+        added so the ``VariableRegistry.get`` deprecation message
+        (which points users at ``get_variable(key).get_data()``)
+        resolves to an actual method on every Variable subclass.
+        Default implementation in this base ABC delegates to
+        ``get()``; concrete subclasses that override ``get`` will
+        be picked up automatically. Subclasses MAY override
+        ``get_data`` directly for a more direct path.
         """
         raise NotImplementedError
+
+    def get_data(self) -> ArrayLike:
+        """Phase I-5 alias for :meth:`get`.
+
+        See the ``get`` docstring for background. This method exists
+        to give the ``VariableRegistry.get`` deprecation message a
+        valid migration target without forcing a substrate-wide
+        rename of the existing ``get`` method (which would touch
+        ~100+ call sites in riverine alone).
+        """
+        return self.get()
 
     @abstractmethod
     def get_at_time(
