@@ -244,6 +244,21 @@ class ChunkedZarrDataStore(ZarrDataStore):
             [c for c in data.coords if c not in keep]
         )
 
+        # Phase J+1 (2026-05-23): rename to parameter_name before writing,
+        # mirroring the same protection ``write()`` got in Phase H-11. The
+        # template was pre-allocated under ``parameter_name``; if the
+        # incoming ``data.name`` was inherited from the IC/BC CSV's
+        # ``value_field`` (e.g. ``"Concentration"``), ``to_zarr`` writes
+        # to a different variable than the template, leaving the
+        # pre-allocated slot untouched AND creating a stray short-time
+        # variable that breaks subsequent chunk writes on the second
+        # constituent ("variable 'Concentration' already exists with
+        # different dimension sizes"). Visible only in chunked mode
+        # because non-chunked uses ``write()`` which already has the
+        # protection.
+        if hasattr(data_clean, "name") and data_clean.name != parameter_name:
+            data_clean = data_clean.rename(parameter_name)
+
         data_clean.to_zarr(
             self.store_path,
             # group=parameter_name,
