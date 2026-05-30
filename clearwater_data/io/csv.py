@@ -27,6 +27,11 @@ class CSVDataSource:
         if self.time_field is not None:
             df = df.rename(columns={self.time_field: "time"})
             df["time"] = pd.to_datetime(df["time"])
+            # Drop rows whose timestamp failed to parse (for example, the
+            # trailing blank/padding rows that spreadsheet exports often
+            # append). Left in place these become NaT entries that break the
+            # monotonic-time check in DataArrayVariable.subset_time.
+            df = df[df["time"].notna()].reset_index(drop=True)
 
         # If spatial field is defined, set a multi-index for [time, spatial]
         if self.time_field is not None and self.spatial_field is not None:
