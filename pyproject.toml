@@ -9,7 +9,7 @@ authors = [
 dependencies=[
     "dask",
     "pandas",
-    "xarray"
+    "xarray>=2025.8"
 ]
 
 [build-system]
